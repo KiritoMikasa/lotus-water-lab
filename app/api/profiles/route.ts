@@ -1,0 +1,5 @@
+import { NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth';
+import db from '@/lib/db';
+export async function GET(){ const u=await getCurrentUser(); if(!u)return NextResponse.json({error:'Unauthorized'},{status:401}); const rows=db.prepare('SELECT * FROM profiles WHERE user_id=? ORDER BY updated_at DESC').all(u.id) as any[]; return NextResponse.json({profiles:rows.map(r=>({...r,drops:JSON.parse(r.drops_json)}))}); }
+export async function POST(req:Request){ const u=await getCurrentUser(); if(!u)return NextResponse.json({error:'Unauthorized'},{status:401}); const b=await req.json(); const n=Number((db.prepare('SELECT COUNT(*) c FROM profiles WHERE user_id=?').get(u.id) as any)?.c ?? 0); if(u.role==='guest'&&n>=20)return NextResponse.json({error:'Demo limit: 20 profiles.'},{status:403}); if(!b.name)return NextResponse.json({error:'Name required'},{status:400}); const info=db.prepare('INSERT INTO profiles(user_id,name,drops_json,ro_tds,note) VALUES(?,?,?,?,?)').run(u.id,b.name,JSON.stringify(b.drops),Number(b.roTds??12),String(b.note??'')); return NextResponse.json({id:info.lastInsertRowid}); }
